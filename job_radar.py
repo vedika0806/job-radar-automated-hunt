@@ -44,9 +44,12 @@ ANTHROPIC_KEY    = os.getenv("ANTHROPIC_KEY", "YOUR_ANTHROPIC_KEY_HERE")
 GMAIL_FROM       = os.getenv("GMAIL_FROM", "your_email@gmail.com")
 GMAIL_TO         = os.getenv("GMAIL_TO", "your_email@gmail.com")
 SEEN_FILE        = "seen_jobs.json"
-TOKEN_FILE       = "token.json"
-# Try Render persistent storage first, then local
-CREDENTIALS_FILE = os.getenv("CREDENTIALS_PATH", "/etc/secrets/credentials.json" if os.path.exists("/etc/secrets") else "credentials.json")
+TOKEN_FILE       = "/tmp/token.json"  # Render: use /tmp for temporary files
+# Credentials: check Render storage, then local
+CREDENTIALS_FILE = "/etc/secrets/credentials.json" if os.path.exists("/etc/secrets/credentials.json") else "credentials.json"
+if not os.path.exists(CREDENTIALS_FILE):
+    log.error(f"❌ credentials.json not found at {CREDENTIALS_FILE}")
+    log.error("Upload credentials.json via Render Files or place it locally")
 CHECK_INTERVAL   = int(os.getenv("CHECK_INTERVAL", "720"))  # 720 mins = 12 hours
 SCOPES           = ["https://www.googleapis.com/auth/gmail.send"]
 
@@ -269,14 +272,25 @@ def get_gmail_service():
     creds = None
     if os.path.exists(TOKEN_FILE):
         creds = Credentials.from_authorized_user_file(TOKEN_FILE, SCOPES)
+
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
+            if not os.path.exists(CREDENTIALS_FILE):
+                log.error(f"❌ credentials.json not found at {CREDENTIALS_FILE}")
+                raise FileNotFoundError(f"credentials.json required at {CREDENTIALS_FILE}")
+
             flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_FILE, SCOPES)
-            creds = flow.run_local_server(port=0)
-        with open(TOKEN_FILE, "w") as f:
-            f.write(creds.to_json())
+            # On Render (headless), use run_local_server with open_browser=False
+            creds = flow.run_local_server(port=0, open_browser=False)
+
+        try:
+            with open(TOKEN_FILE, "w") as f:
+                f.write(creds.to_json())
+        except Exception as e:
+            log.warning(f"Could not save token to {TOKEN_FILE}: {e}")
+
     return build("gmail", "v1", credentials=creds)
 
 def send_email(subject: str, html_body: str):
