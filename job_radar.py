@@ -128,14 +128,15 @@ def search_jobs(query: str, location: str) -> list[dict]:
             "engine": "google_jobs",
             "q": query,
             "location": location,
-            "hl": "en",
-            "chips": "date_posted:today",
             "api_key": SERPAPI_KEY,
         }
         response = requests.get("https://serpapi.com/search", params=params, timeout=15)
         response.raise_for_status()
         results = response.json()
         return results.get("jobs_results", [])
+    except requests.exceptions.HTTPError as e:
+        log.warning(f"SerpAPI error for '{query}' in '{location}': {e.response.status_code} - {e.response.text}")
+        return []
     except Exception as e:
         log.warning(f"SerpAPI error for '{query}' in '{location}': {e}")
         return []
