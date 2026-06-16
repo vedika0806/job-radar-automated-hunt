@@ -26,7 +26,6 @@ import os, json, time, datetime, logging, re
 from dotenv import load_dotenv
 import schedule
 import requests
-from serpapi import GoogleSearch
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import base64
@@ -46,7 +45,8 @@ GMAIL_FROM       = os.getenv("GMAIL_FROM", "your_email@gmail.com")
 GMAIL_TO         = os.getenv("GMAIL_TO", "your_email@gmail.com")
 SEEN_FILE        = "seen_jobs.json"
 TOKEN_FILE       = "token.json"
-CREDENTIALS_FILE = "credentials.json"
+# Try Render persistent storage first, then local
+CREDENTIALS_FILE = os.getenv("CREDENTIALS_PATH", "/etc/secrets/credentials.json" if os.path.exists("/etc/secrets") else "credentials.json")
 CHECK_INTERVAL   = int(os.getenv("CHECK_INTERVAL", "720"))  # 720 mins = 12 hours
 SCOPES           = ["https://www.googleapis.com/auth/gmail.send"]
 
@@ -129,10 +129,12 @@ def search_jobs(query: str, location: str) -> list[dict]:
             "q": query,
             "location": location,
             "hl": "en",
-            "chips": "date_posted:today",   # last 24h (tightest Google allows)
+            "chips": "date_posted:today",
             "api_key": SERPAPI_KEY,
         }
-        results = GoogleSearch(params).get_dict()
+        response = requests.get("https://serpapi.com/search", params=params, timeout=15)
+        response.raise_for_status()
+        results = response.json()
         return results.get("jobs_results", [])
     except Exception as e:
         log.warning(f"SerpAPI error for '{query}' in '{location}': {e}")
