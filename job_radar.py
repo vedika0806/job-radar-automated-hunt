@@ -1,9 +1,9 @@
 """
-JobRadar AI — Automated Job Hunt for Vedika Sumbli
-====================================================
-Searches Google Jobs via SerpAPI every hour for 7 target roles,
+JobRadar AI — Automated Job Hunt
+==================================
+Searches Google Jobs via SerpAPI every 12 hours across multiple tech roles,
 scores matches against your resume skills, deduplicates, and sends
-a Gmail digest with AI-generated cover letter snippets.
+a Gmail digest with all new portfolio openings and AI-generated cover letter snippets.
 
 SETUP (one-time, ~10 minutes):
   1. pip install google-api-python-client google-auth-oauthlib serpapi schedule requests
@@ -47,8 +47,7 @@ GMAIL_TO         = os.getenv("GMAIL_TO", "your_email@gmail.com")
 SEEN_FILE        = "seen_jobs.json"
 TOKEN_FILE       = "token.json"
 CREDENTIALS_FILE = "credentials.json"
-CHECK_INTERVAL   = int(os.getenv("CHECK_INTERVAL", "60"))
-INSTANT_THRESHOLD = int(os.getenv("INSTANT_THRESHOLD", "80"))
+CHECK_INTERVAL   = int(os.getenv("CHECK_INTERVAL", "720"))  # 720 mins = 12 hours
 SCOPES           = ["https://www.googleapis.com/auth/gmail.send"]
 
 # Load profile and skills from config.json
@@ -64,15 +63,20 @@ except FileNotFoundError:
 
 ALL_SKILLS = [s.lower() for group in SKILLS.values() for s in group]
 
-# ─── TARGET ROLES ──────────────────────────────────────────────────────────────
-ROLE_QUERIES = [
-    ("ML Engineer",              ["machine learning engineer", "ML engineer"]),
-    ("Data Scientist",           ["data scientist"]),
-    ("Data Analyst",             ["data analyst"]),
-    ("AI Engineer",              ["AI engineer", "artificial intelligence engineer", "GenAI engineer"]),
-    ("Data Engineer",            ["data engineer"]),
-    ("Forward Deployed Engineer",["forward deployed engineer", "field engineer software"]),
-    ("SWE",                      ["software engineer machine learning", "software engineer data"]),
+# ─── JOB SEARCH QUERIES ────────────────────────────────────────────────────────
+# Search for all portfolio openings across multiple tech roles
+JOB_QUERIES = [
+    "machine learning engineer",
+    "data scientist",
+    "data analyst",
+    "AI engineer",
+    "data engineer",
+    "software engineer",
+    "forward deployed engineer",
+    "product engineer",
+    "backend engineer",
+    "full stack engineer",
+    "ML ops engineer",
 ]
 
 LOCATIONS = ["San Francisco Bay Area", "United States", "Remote"]
@@ -135,33 +139,33 @@ def search_jobs(query: str, location: str) -> list[dict]:
         return []
 
 def collect_new_jobs(seen: set) -> list[dict]:
-    """Run all role × location queries and return deduplicated new jobs."""
+    """Search all job queries × locations and return deduplicated new jobs."""
     new_jobs = []
-    for role_label, queries in ROLE_QUERIES:
-        for query in queries:
-            for location in LOCATIONS:
-                raw = search_jobs(query, location)
-                for j in raw:
-                    job_id = j.get("job_id") or (j.get("title","") + j.get("company_name",""))
-                    if job_id in seen:
-                        continue
-                    description = j.get("description", "")
-                    match_pct, matched_skills = score_job(j.get("title",""), description)
-                    new_jobs.append({
-                        "id":            job_id,
-                        "role_label":    role_label,
-                        "title":         j.get("title", ""),
-                        "company":       j.get("company_name", ""),
-                        "location":      j.get("location", location),
-                        "posted":        j.get("detected_extensions", {}).get("posted_at", "Recently"),
-                        "apply_link":    j.get("related_links", [{}])[0].get("link", j.get("share_link","")),
-                        "description":   description[:800],
-                        "match_pct":     match_pct,
-                        "matched_skills":matched_skills,
-                    })
-                    seen.add(job_id)
+    for query in JOB_QUERIES:
+        for location in LOCATIONS:
+            raw = search_jobs(query, location)
+            for j in raw:
+                job_id = j.get("job_id") or (j.get("title","") + j.get("company_name",""))
+                if job_id in seen:
+                    continue
+                description = j.get("description", "")
+                match_pct, matched_skills = score_job(j.get("title",""), description)
+                new_jobs.append({
+                    "id":            job_id,
+                    "title":         j.get("title", ""),
+                    "company":       j.get("company_name", ""),
+                    "location":      j.get("location", location),
+                    "posted":        j.get("detected_extensions", {}).get("posted_at", "Recently"),
+                    "apply_link":    j.get("related_links", [{}])[0].get("link", j.get("share_link","")),
+                    "description":   description[:800],
+                    "match_pct":     match_pct,
+                    "matched_skills":matched_skills,
+                })
+                seen.add(job_id)
+
     # Sort by match score descending
     new_jobs.sort(key=lambda x: x["match_pct"], reverse=True)
+
     # Deduplicate by (title, company)
     seen_tc = set()
     deduped = []
@@ -243,15 +247,15 @@ def build_email_html(jobs: list[dict], run_time: str) -> str:
 <div style="max-width:620px;margin:24px auto;background:#fff;border-radius:12px;
      overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08)">
   <div style="background:#111;padding:20px 24px;color:#fff">
-    <div style="font-size:18px;font-weight:600">🚨 {count} new job match{'es' if count!=1 else ''}</div>
-    <div style="font-size:13px;color:#aaa;margin-top:4px">{run_time} · {GMAIL_TO}</div>
+    <div style="font-size:18px;font-weight:600">🎯 {count} new job opening{'s' if count!=1 else ''} found</div>
+    <div style="font-size:13px;color:#aaa;margin-top:4px">{run_time}</div>
   </div>
   <table style="width:100%;border-collapse:collapse">{rows}</table>
   <div style="padding:16px 24px;background:#fafafa;font-size:12px;color:#888;
        border-top:1px solid #eee">
-    Roles: ML Eng · Data Scientist · Data Analyst · AI Eng · Data Eng · Forward Deployed Eng · SWE<br>
+    Searching: ML Engineer · Data Scientist · Data Analyst · AI Engineer · Data Engineer · Software Engineer · Product Engineer<br>
     Locations: San Francisco Bay Area · USA Nationwide · Remote<br>
-    <a href="mailto:{GMAIL_TO}">Unsubscribe</a> · JobRadar AI
+    <a href="mailto:{GMAIL_TO}">Unsubscribe</a> · JobRadar AI (12-hourly)
   </div>
 </div></body></html>"""
 
@@ -296,27 +300,19 @@ def run_job_search():
 
     now_str = datetime.datetime.now().strftime("%a %d %b, %I:%M %p")
 
-    # Instant alert for very high matches
-    instant = [j for j in new_jobs if j["match_pct"] >= INSTANT_THRESHOLD]
-    if instant:
-        html = build_email_html(instant, now_str)
-        send_email(f"⚡ {len(instant)} high-match job(s) just posted — {instant[0]['company']} ({instant[0]['match_pct']}%)", html)
-
-    # Full digest (excluding already instant-alerted ones)
-    rest = [j for j in new_jobs if j["match_pct"] < INSTANT_THRESHOLD]
-    if rest:
-        html = build_email_html(rest, now_str)
-        send_email(f"📋 {len(rest)} new job match(es) — {now_str}", html)
+    # Send all jobs found
+    html = build_email_html(new_jobs, now_str)
+    send_email(f"🎯 {len(new_jobs)} new portfolio opening(s) — {now_str}", html)
 
     log.info("─── Job search complete ───")
 
 # ─── SCHEDULER ─────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     log.info(f"JobRadar AI starting up for {CANDIDATE.get('name', 'User')}...")
-    log.info(f"Monitoring roles: {[r[0] for r in ROLE_QUERIES]}")
+    log.info(f"Searching job queries: {JOB_QUERIES}")
     log.info(f"Locations: {LOCATIONS}")
-    log.info(f"Sending alerts to: {GMAIL_TO}")
-    log.info(f"Check interval: every {CHECK_INTERVAL} minutes")
+    log.info(f"Sending email to: {GMAIL_TO}")
+    log.info(f"Search frequency: every {CHECK_INTERVAL} minutes ({CHECK_INTERVAL//60} hours)")
 
     # Run immediately on start
     run_job_search()
