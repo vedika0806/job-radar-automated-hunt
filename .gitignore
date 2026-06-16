@@ -1,10 +1,19 @@
+# Sensitive files - NEVER commit
 credentials.json
 .env
+config.json
+token.json
+seen_jobs.json
+
+# Python
 __pycache__/
 *.pyc
-.DS_Store
 *.egg-info/
 dist/
 build/
 .venv/
 venv/
+
+# OS
+.DS_Store
+.env.local

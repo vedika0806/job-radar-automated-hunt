@@ -23,6 +23,7 @@ DEPLOY 24/7 FREE:
 """
 
 import os, json, time, datetime, logging, re
+from dotenv import load_dotenv
 import schedule
 import requests
 from serpapi import GoogleSearch
@@ -36,41 +37,30 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
+load_dotenv()
+
 # ─── CONFIG ────────────────────────────────────────────────────────────────────
-SERPAPI_KEY      = "YOUR_SERPAPI_KEY_HERE"          # https://serpapi.com
-GMAIL_TO         = "vedika.sumbli@gmail.com"
-GMAIL_FROM       = "vedika.sumbli@gmail.com"        # must match OAuth account
+SERPAPI_KEY      = os.getenv("SERPAPI_KEY", "YOUR_SERPAPI_KEY_HERE")
+ANTHROPIC_KEY    = os.getenv("ANTHROPIC_KEY", "YOUR_ANTHROPIC_KEY_HERE")
+GMAIL_FROM       = os.getenv("GMAIL_FROM", "your_email@gmail.com")
+GMAIL_TO         = os.getenv("GMAIL_TO", "your_email@gmail.com")
 SEEN_FILE        = "seen_jobs.json"
 TOKEN_FILE       = "token.json"
 CREDENTIALS_FILE = "credentials.json"
-CHECK_INTERVAL   = 60                               # minutes between searches
-INSTANT_THRESHOLD = 80                             # match % for instant alert
+CHECK_INTERVAL   = int(os.getenv("CHECK_INTERVAL", "60"))
+INSTANT_THRESHOLD = int(os.getenv("INSTANT_THRESHOLD", "80"))
 SCOPES           = ["https://www.googleapis.com/auth/gmail.send"]
-ANTHROPIC_KEY    = "YOUR_ANTHROPIC_KEY_HERE"       # optional: for cover letters
 
-# ─── YOUR PROFILE ──────────────────────────────────────────────────────────────
-CANDIDATE = {
-    "name": "Vedika Sumbli",
-    "email": GMAIL_TO,
-    "phone": "(657) 750-6525",
-    "location": "San Jose, CA",
-    "degree": "MS Applied Data Intelligence, SJSU (In Progress)",
-    "linkedin": "linkedin.com/in/vedikasumbli",
-    "github": "github.com/vedikasumbli",
-}
-
-SKILLS = {
-    "languages":  ["Python", "SQL", "Java", "Scala", "C", "C++", "MATLAB"],
-    "ml_ai":      ["PyTorch", "TensorFlow", "Scikit-Learn", "Transformers", "LangChain",
-                   "Ollama", "Neo4j", "ElasticSearch", "NumPy", "Pandas", "XGBoost",
-                   "GNN", "RAG", "Few-Shot Learning", "SHAP", "ARIMA", "SMOTE",
-                   "Grad-CAM", "ALS", "KMeans", "TF-IDF", "NLP", "LLM"],
-    "cloud":      ["AWS", "S3", "EC2", "SageMaker", "Lambda", "Athena", "EMR", "RDS",
-                   "Snowflake", "Redis", "Kafka", "Spark", "Hadoop"],
-    "tools":      ["Airflow", "Docker", "Tableau", "Power BI", "Streamlit", "Git",
-                   "Jira", "Parquet", "AWS QuickSight", "Agentic pipeline"],
-    "soft":       ["Team leadership", "Stakeholder management", "Agile", "Project management"],
-}
+# Load profile and skills from config.json
+try:
+    with open("config.json") as f:
+        config = json.load(f)
+    CANDIDATE = config["candidate"]
+    SKILLS = config["skills"]
+except FileNotFoundError:
+    log_startup_error = "❌ config.json not found. Copy config.json.example to config.json and fill in your details."
+    CANDIDATE = {"name": "User", "email": GMAIL_TO}
+    SKILLS = {}
 
 ALL_SKILLS = [s.lower() for group in SKILLS.values() for s in group]
 
@@ -196,10 +186,9 @@ def generate_cover_snippet(job: dict) -> str:
             "messages": [{
                 "role": "user",
                 "content": (
-                    f"Write a 3-sentence cover letter opener for Vedika Sumbli applying to "
+                    f"Write a 3-sentence cover letter opener for {CANDIDATE['name']} applying to "
                     f"{job['title']} at {job['company']}. "
-                    f"Her skills: Python, PyTorch, LangChain, Spark, AWS, Airflow, RAG, GNNs. "
-                    f"She's completing MS Applied Data Intelligence at SJSU. "
+                    f"Location: {CANDIDATE['location']}. Education: {CANDIDATE['degree']}. "
                     f"Matched skills for this role: {', '.join(job['matched_skills'])}. "
                     f"Be specific, confident, no fluff. Return only the 3 sentences."
                 )
@@ -255,7 +244,7 @@ def build_email_html(jobs: list[dict], run_time: str) -> str:
      overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08)">
   <div style="background:#111;padding:20px 24px;color:#fff">
     <div style="font-size:18px;font-weight:600">🚨 {count} new job match{'es' if count!=1 else ''}</div>
-    <div style="font-size:13px;color:#aaa;margin-top:4px">{run_time} · vedika.sumbli@gmail.com</div>
+    <div style="font-size:13px;color:#aaa;margin-top:4px">{run_time} · {GMAIL_TO}</div>
   </div>
   <table style="width:100%;border-collapse:collapse">{rows}</table>
   <div style="padding:16px 24px;background:#fafafa;font-size:12px;color:#888;
@@ -323,7 +312,7 @@ def run_job_search():
 
 # ─── SCHEDULER ─────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    log.info("JobRadar AI starting up for Vedika Sumbli...")
+    log.info(f"JobRadar AI starting up for {CANDIDATE.get('name', 'User')}...")
     log.info(f"Monitoring roles: {[r[0] for r in ROLE_QUERIES]}")
     log.info(f"Locations: {LOCATIONS}")
     log.info(f"Sending alerts to: {GMAIL_TO}")

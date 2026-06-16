@@ -1,0 +1,18 @@
+{
+  "candidate": {
+    "name": "Your Name",
+    "email": "your_email@gmail.com",
+    "phone": "YOUR_PHONE",
+    "location": "Your Location",
+    "degree": "Your Degree",
+    "linkedin": "linkedin.com/in/yourprofile",
+    "github": "github.com/yourprofile"
+  },
+  "skills": {
+    "languages": ["Python", "SQL", "Java"],
+    "ml_ai": ["PyTorch", "TensorFlow", "Scikit-Learn"],
+    "cloud": ["AWS", "S3", "EC2"],
+    "tools": ["Docker", "Git", "Airflow"],
+    "soft": ["Team leadership", "Project management"]
+  }
+}
