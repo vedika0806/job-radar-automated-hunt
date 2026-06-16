@@ -65,21 +65,23 @@ ALL_SKILLS = [s.lower() for group in SKILLS.values() for s in group]
 
 # ─── JOB SEARCH QUERIES ────────────────────────────────────────────────────────
 # Search for all portfolio openings across multiple tech roles
+# Note: "remote" keyword included to catch work-from-home positions
 JOB_QUERIES = [
-    "machine learning engineer",
-    "data scientist",
-    "data analyst",
-    "AI engineer",
-    "data engineer",
-    "software engineer",
-    "forward deployed engineer",
-    "product engineer",
-    "backend engineer",
-    "full stack engineer",
-    "ML ops engineer",
+    "machine learning engineer remote",
+    "data scientist remote",
+    "data analyst remote",
+    "AI engineer remote",
+    "data engineer remote",
+    "software engineer remote",
+    "forward deployed engineer remote",
+    "product engineer remote",
+    "backend engineer remote",
+    "full stack engineer remote",
+    "ML ops engineer remote",
 ]
 
-LOCATIONS = ["San Francisco Bay Area", "United States", "Remote"]
+# Valid SerpAPI locations (SerpAPI doesn't support "Remote" - search by country/city instead)
+LOCATIONS = ["San Francisco Bay Area", "United States"]
 
 # ─── LOGGING ───────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -256,8 +258,8 @@ def build_email_html(jobs: list[dict], run_time: str) -> str:
   <table style="width:100%;border-collapse:collapse">{rows}</table>
   <div style="padding:16px 24px;background:#fafafa;font-size:12px;color:#888;
        border-top:1px solid #eee">
-    Searching: ML Engineer · Data Scientist · Data Analyst · AI Engineer · Data Engineer · Software Engineer · Product Engineer<br>
-    Locations: San Francisco Bay Area · USA Nationwide · Remote<br>
+    Searching: ML Engineer · Data Scientist · Data Analyst · AI Engineer · Data Engineer · Software Engineer<br>
+    Locations: San Francisco Bay Area · USA Nationwide (Remote included)<br>
     <a href="mailto:{GMAIL_TO}">Unsubscribe</a> · JobRadar AI (12-hourly)
   </div>
 </div></body></html>"""
